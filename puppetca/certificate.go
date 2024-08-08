@@ -56,7 +56,7 @@ func (c *Client) GetCertificate(certificate model.Certificate) (*model.Certifica
 
 // https://www.puppet.com/docs/puppet/8/server/http_certificate_status#search
 
-func (c *Client) ListCertificates(state string) ([]*model.Certificate, error) {
+func (c *Client) ListCertificates(state string) ([]model.Certificate, error) {
 	req := c.NewRequest().SetPath("/certificate_statuses/:any_key")
 	if state != "" {
 		req = req.AddQueryString("state", state)
