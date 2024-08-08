@@ -9,11 +9,18 @@ import (
 type String string
 
 func (s *String) UnmarshalJSON(b []byte) error {
+	var str string
+	err := json.Unmarshal(b, &str)
+
+	if err != nil {
+		return err
+	}
+
 	decoder := charmap.ISO8859_1.NewDecoder()
-	b, err := decoder.Bytes(b)
+	str, err = decoder.String(str)
 
 	if err == nil {
-		*s = String(b)
+		*s = String(str)
 	}
 
 	return err
@@ -27,4 +34,8 @@ func (s *String) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(str)
+}
+
+func (s String) String() string {
+	return string(s)
 }
