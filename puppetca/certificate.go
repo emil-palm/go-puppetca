@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/camptocamp/go-puppetca/puppetca/model"
-	"github.com/camptocamp/go-puppetca/puppetca/pson"
 	"github.com/pkg/errors"
 )
 
@@ -17,8 +16,8 @@ const (
 )
 
 type CertificateSave struct {
-	DesiredState pson.String `json:"desired_state"`
-	TTL          int         `json:"cert_ttl,omitempty"`
+	DesiredState string `json:"desired_state"`
+	TTL          int    `json:"cert_ttl,omitempty"`
 }
 
 // https://www.puppet.com/docs/puppet/8/server/http_certificate
