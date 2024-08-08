@@ -24,7 +24,7 @@ type CertificateSave struct {
 // https://www.puppet.com/docs/puppet/8/server/http_certificate
 
 func (c *Client) DownloadCertificateNamed(name string) (string, error) {
-	pem, err := c.Get(c.NewRequest().SetPath("certificate/%s", name))
+	pem, err := c.Get(c.NewRequest().SetPath("/certificate/%s", name))
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to retrieve certificate %s", name)
 	}
@@ -37,7 +37,7 @@ func (c *Client) DownloadCertificateNamed(name string) (string, error) {
 
 func (c *Client) GetCertificateNamed(name string) (*model.Certificate, error) {
 
-	data, err := c.Get(c.NewRequest().SetPath("certificate_status/%s", name))
+	data, err := c.Get(c.NewRequest().SetPath("/certificate_status/%s", name))
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +56,8 @@ func (c *Client) GetCertificate(certificate model.Certificate) (*model.Certifica
 
 // https://www.puppet.com/docs/puppet/8/server/http_certificate_status#search
 
-func (c *Client) ListCertificates(state string) ([]model.Certificate, error) {
-	req := c.NewRequest().SetPath("certificate_statuses/:any_key")
+func (c *Client) ListCertificates(state string) ([]*model.Certificate, error) {
+	req := c.NewRequest().SetPath("/certificate_statuses/:any_key")
 	if state != "" {
 		req = req.AddQueryString("state", state)
 	}
@@ -103,7 +103,7 @@ This does not revoke the certificate if one is present.
 https://www.puppet.com/docs/puppet/8/server/http_certificate_status#delete
 */
 func (c *Client) DeleteCertificateNamed(name string) error {
-	resp, err := c.Delete(c.NewRequest().SetPath("certificate_status/%s", name))
+	resp, err := c.Delete(c.NewRequest().SetPath("/certificate_status/%s", name))
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (c *Client) CleanCertificateNames(certificates ...string) (cleaned, skipped
 	}{
 		CertNames: certificates,
 	}
-	resp, err := c.Put(c.NewRequest().SetPath("clean").SetJSONBody(body))
+	resp, err := c.Put(c.NewRequest().SetPath("/clean").SetJSONBody(body))
 
 	if err != nil {
 		return nil, nil, err

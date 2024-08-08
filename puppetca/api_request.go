@@ -21,6 +21,7 @@ type Request struct {
 
 func NewRequest(baseurl string) *Request {
 	return &Request{
+		baseurl: baseurl,
 		headers: make(map[string]string, 0),
 		query:   make(url.Values, 0),
 	}

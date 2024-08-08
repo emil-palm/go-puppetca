@@ -9,7 +9,7 @@ import (
 // https://www.puppet.com/docs/puppet/8/server/http_certificate_sign
 
 func (c *Client) DownloadCertificateRequest(name string) (string, error) {
-	data, err := c.Get(c.NewRequest().SetPath("certificate_request/%s", name))
+	data, err := c.Get(c.NewRequest().SetPath("/certificate_request/%s", name))
 	if err != nil {
 		return "", err
 	}
@@ -18,7 +18,7 @@ func (c *Client) DownloadCertificateRequest(name string) (string, error) {
 }
 
 func (c *Client) CreateCertificateRequest(name string, pem string) error {
-	req := c.NewRequest().SetPath("certificate_request/%s", name)
+	req := c.NewRequest().SetPath("/certificate_request/%s", name)
 	req.SetBody([]byte(pem))
 	_, err := c.Put(req)
 
@@ -30,7 +30,7 @@ func (c *Client) CreateCertificateRequest(name string, pem string) error {
 }
 
 func (c *Client) DestroyCertificateRequestNamed(name string) error {
-	_, err := c.Delete(c.NewRequest().SetPath("certificate_request/%s", name))
+	_, err := c.Delete(c.NewRequest().SetPath("/certificate_request/%s", name))
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (c *Client) BulkSignCertificateRequestsNamed(certificates ...string) (signe
 		CertNames: certificates,
 	}
 
-	data, err := c.Post(c.NewRequest().SetPath("sign").SetJSONBody(body))
+	data, err := c.Post(c.NewRequest().SetPath("/sign").SetJSONBody(body))
 
 	if err != nil {
 		return nil, nil, nil, err
@@ -105,7 +105,7 @@ func (c *Client) BulkSignCertificateRequests(certificates ...model.Certificate) 
 
 func (c *Client) SignAllCertificateRequests() (signed, missing_csr, sign_errors []string, err error) {
 
-	data, err := c.Post(c.NewRequest().SetPath("sign/all"))
+	data, err := c.Post(c.NewRequest().SetPath("/sign/all"))
 
 	if err != nil {
 		return nil, nil, nil, err
