@@ -1,92 +1,14 @@
 package puppetca
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strings"
-
 	"github.com/pkg/errors"
 )
 
-// Client is a Puppet CA client
-type Client struct {
-	baseURL    string
-	httpClient *http.Client
-}
-
-func isFile(str string) bool {
-	return strings.HasPrefix(str, "/")
-}
-
-// NewClient returns a new Client
-func NewClient(baseURL, keyStr, certStr, caStr string) (c Client, err error) {
-	// Load client cert
-	var cert tls.Certificate
-	if isFile(certStr) {
-		if !isFile(keyStr) {
-			err = fmt.Errorf("cert points to a file but key is a string")
-			return
-		}
-
-		cert, err = tls.LoadX509KeyPair(certStr, keyStr)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to load client cert from file %s", certStr)
-			return c, err
-		}
-	} else {
-		if isFile(keyStr) {
-			err = fmt.Errorf("cert is a string but key points to a file")
-			return c, err
-		}
-
-		cert, err = tls.X509KeyPair([]byte(certStr), []byte(keyStr))
-		if err != nil {
-			err = errors.Wrapf(err, "failed to load client cert from string")
-			return c, err
-		}
-	}
-
-	// Load CA cert
-	var caCert []byte
-	if isFile(caStr) {
-		caCert, err = ioutil.ReadFile(caStr)
-		if err != nil {
-			err = errors.Wrapf(err, "failed to load CA cert at %s", caStr)
-			return
-		}
-	} else {
-		caCert = []byte(caStr)
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	// Setup HTTPS client
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-	}
-	tr := &http.Transport{TLSClientConfig: tlsConfig}
-	httpClient := &http.Client{Transport: tr}
-	c = Client{baseURL, httpClient}
-
-	return
-}
+// Following functions are backported
 
 // GetCertByName returns the certificate of a node by its name
 func (c *Client) GetCertByName(nodename, env string) (string, error) {
-	pem, err := c.Get(fmt.Sprintf("certificate/%s", nodename), env, nil)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to retrieve certificate %s", nodename)
-	}
-	return pem, nil
-}
-
-// GetRequest return a submitted CSR if any
-func (c *Client) GetRequest(nodename, env string) (string, error) {
-	pem, err := c.Get(fmt.Sprintf("certificate_request/%s", nodename), env, nil)
+	pem, err := c.DownloadCertificateNamed(nodename)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to retrieve certificate %s", nodename)
 	}
@@ -95,20 +17,27 @@ func (c *Client) GetRequest(nodename, env string) (string, error) {
 
 // DeleteCertByName deletes the certificate of a given node
 func (c *Client) DeleteCertByName(nodename, env string) error {
-	_, err := c.Delete(fmt.Sprintf("certificate_status/%s", nodename), env, nil)
+	err := c.DeleteCertificateNamed(nodename)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete certificate %s", nodename)
 	}
 	return nil
 }
 
+// GetRequest return a submitted CSR if any
+func (c *Client) GetRequest(nodename, env string) (string, error) {
+
+	pem, err := c.DownloadCertificateRequest(nodename)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to retrieve certificate %s", nodename)
+	}
+	return pem, nil
+}
+
 // SubmitRequest submits a CSR
 func (c *Client) SubmitRequest(nodename, pem, env string) error {
 	// Content-Type: text/plain
-	headers := map[string]string{
-		"Content-Type": "text/plain",
-	}
-	_, err := c.Put(fmt.Sprintf("certificate_request/%s", nodename), env, pem, headers)
+	err := c.CreateCertificateRequest(nodename, pem)
 	if err != nil {
 		return errors.Wrapf(err, "failed to submit CSR %s", nodename)
 	}
@@ -117,86 +46,9 @@ func (c *Client) SubmitRequest(nodename, pem, env string) error {
 
 // SignRequest signs a CSR
 func (c *Client) SignRequest(nodename, env string) error {
-	action := "{\"desired_state\":\"signed\"}"
-	headers := map[string]string{
-		"Content-Type": "text/pson",
-	}
-	_, err := c.Put(fmt.Sprintf("certificate_status/%s", nodename), env, action, headers)
+	err := c.SignCertificateRequestNamed(nodename, 0)
 	if err != nil {
 		return errors.Wrapf(err, "failed to sign CSR %s", nodename)
 	}
 	return nil
-}
-
-// Get performs a GET request
-func (c *Client) Get(path, env string, headers map[string]string) (string, error) {
-	req, err := c.newHTTPRequest("GET", path)
-	if err != nil {
-		return "", err
-	}
-	if env != "" {
-		q := req.URL.Query()
-		q.Add("environment", env)
-		req.URL.RawQuery = q.Encode()
-	}
-	return c.Do(req, headers)
-}
-
-// Put performs a PUT request
-func (c *Client) Put(path, env, data string, headers map[string]string) (string, error) {
-	req, err := c.newHTTPRequest("PUT", path)
-	if err != nil {
-		return "", err
-	}
-	if env != "" {
-		q := req.URL.Query()
-		q.Add("environment", env)
-		req.URL.RawQuery = q.Encode()
-	}
-	req.Body = ioutil.NopCloser(strings.NewReader(data))
-	return c.Do(req, headers)
-}
-
-// Delete performs a DELETE request
-func (c *Client) Delete(path, env string, headers map[string]string) (string, error) {
-	req, err := c.newHTTPRequest("DELETE", path)
-	if err != nil {
-		return "", err
-	}
-	if env != "" {
-		q := req.URL.Query()
-		q.Add("environment", env)
-		req.URL.RawQuery = q.Encode()
-	}
-	return c.Do(req, headers)
-}
-
-func (c *Client) newHTTPRequest(method, path string) (*http.Request, error) {
-	uri := fmt.Sprintf("%s/puppet-ca/v1/%s", c.baseURL, path)
-	req, err := http.NewRequest(method, uri, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create http request for URL %s", uri)
-	}
-	return req, nil
-}
-
-// Do performs an HTTP request
-func (c *Client) Do(req *http.Request, headers map[string]string) (string, error) {
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to %s URL %s", req.Method, req.URL)
-	}
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return "", fmt.Errorf("failed to %s URL %s, got: %s", req.Method, req.URL, resp.Status)
-	}
-	defer resp.Body.Close()
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to read body response")
-	}
-
-	return string(content), nil
 }
